@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Article Scraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Add basic styling for the progress bar */
+        .progress {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 24px;
+            background-color: #4CAF50;
+            text-align: center;
+            color: white;
+            border-radius: 4px;
+            line-height: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Article Scraper</h1>
+        <form id="scrape-form" method="POST" action="/">
+            <div class="form-group">
+                <label for="topic">Search Term:</label>
+                <input type="text" id="topic" name="topic" required>
+            </div>
+            <div class="form-group">
+                <label for="num_results">Number of Sites to Scrape:</label>
+                <input type="number" id="num_results" name="num_results" min="1" max="10" required>
+            </div>
+            <button type="submit" class="btn">Start Scraping</button>
+        </form>
+
+        <div id="progress-container" style="display:none;">
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar">0%</div>
+            </div>
+            <pre id="progress"></pre>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('scrape-form').onsubmit = function(event) {
+            event.preventDefault();
+            const topic = document.getElementById('topic').value;
+            const numResults = document.getElementById('num_results').value;
+            const progressContainer = document.getElementById('progress-container');
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progress-bar');
+
+            progressContainer.style.display = 'block';
+            progress.textContent = '';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+
+            fetch(`/scrape?topic=${encodeURIComponent(topic)}&num_results=${encodeURIComponent(numResults)}`)
+    .then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        function read() {
+            reader.read().then(({ done, value }) => {
+                if (done) return;
+                const text = decoder.decode(value);
+                text.split('\n').forEach(line => {
+                    if (line.startsWith('data: ')) {
+                        const data = line.replace('data: ', '').trim();
+                        if (data.startsWith('done')) {
+                            const filePath = data.replace('done ', '');
+                            // Redirect to the download page
+                            window.location.href = `/download?file_path=${encodeURIComponent(filePath)}`;
+                        } else if (data.startsWith('progress:')) {
+                            const percentage = data.replace('progress:', '');
+                            progressBar.style.width = `${percentage}%`;
+                            progressBar.textContent = `${percentage}%`;
+                        } else {
+                            progress.textContent += data + '\n';
+                        }
+                    }
+                });
+                read();
+            });
+        }
+        read();
+    });
+
+        };
+    </script>
+</body>
+</html>
